@@ -1,8 +1,9 @@
 # Elfbot 3000
 
 Takes a list of people from a CSV file and randomly generates secret santa mappings.
-Sends text messages (SMS) to everyone after. That's it.
+Sends text messages (SMS) to everyone. That's it.
 Also it supports couples so people get someone other than their spouse.
+Also it's anonymous, the organizer won't know who has whom.
 
 _NOTE: Requires Twilio account_
 
