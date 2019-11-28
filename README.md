@@ -9,11 +9,10 @@ _NOTE: Requires Twilio account_
 
 ## Setup
 
-Set up the following environment variables with your information from the Twilio dashboard.
+Set up the necessary environment variables with your information from the Twilio dashboard.
+Put them into `twilio.env` and execute `source twilio.env`
 
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_PHONE_NUMBER`
+Install dependencies via `pip install -r requirements.txt`
 
 ## CSV format
 
@@ -23,3 +22,11 @@ Buffalo,+456123789,1
 Mortimer,+123789456,2
 Wilson,+123456789,3
 ```
+
+## How to run
+
+Execute tests via `pytest`.
+
+Do a dry run: `python send_secret_santas.py <your file>.csv -d`
+
+Do the real thing: `python send_secret_santas.py <your file>.csv`
