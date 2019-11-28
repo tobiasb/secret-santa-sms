@@ -22,5 +22,6 @@ class SecretSantaGenerator:
             current_mapping = random.sample(range(0, len(participants)), len(participants))
             is_valid_mapping = self.validate_mapping(participants, current_mapping)
 
-        return [{'giver': participants[i], 'receiver': participants[current_mapping[i]]} for i in range(0, len(participants))]
+        indices = range(0, len(participants))
+        return [{'giver': participants[i], 'receiver': participants[current_mapping[i]]} for i in indices]
 
