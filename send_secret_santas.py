@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generates secret santa mappings and notifies people via sms')
     parser.add_argument('participants_file', help='path to csv file. See README.md for format')
     parser.add_argument('-d', '--dryrun', help='does not actually send the text message', action='store_true')
+    parser.add_argument('-t', '--testrun', help='sends a test text message', action='store_true')
     args = parser.parse_args()
 
     participants = read_participants(args.participants_file)
@@ -43,11 +44,17 @@ if __name__ == "__main__":
     if args.dryrun:
         print("Dry run")
 
+    if args.testrun:
+        print("Test run")
+
     for pair in mapping:
         if args.dryrun:
             print('{} is buying a gift for {}'.format(pair['giver']['name'], pair['receiver']['name']))
         else:
-            body = u"Hello {}. This is Elfbot 3000. You are {}'s secret Santa!".format(pair['giver']['name'], pair['receiver']['name'])
+            if args.testrun:
+                body = "This is a test message from Elfbot 3000. Beep Boop."
+            else:
+                body = u"Hello {}. This is Elfbot 3000. You are {}'s secret Santa!".format(pair['giver']['name'], pair['receiver']['name'])
             client = Client(account_sid, auth_token)
             client.messages.create(body=body, from_=from_number, to=pair['giver']['phone_number'])
             print('Message sent!')

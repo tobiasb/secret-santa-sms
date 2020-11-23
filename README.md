@@ -29,4 +29,6 @@ Execute tests via `pytest`.
 
 Do a dry run: `python send_secret_santas.py <your file>.csv -d`
 
+Send a test message to everyone: `python send_secret_santas.py <your file>.csv -t`
+
 Do the real thing: `python send_secret_santas.py <your file>.csv`
