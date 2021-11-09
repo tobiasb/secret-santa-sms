@@ -18,8 +18,20 @@ def read_participants(file_name):
                 'name': row['Name'],
                 'phone_number': row['PhoneNumber'],
                 'couple_id': row['CoupleId'],
+                'language': row['Language'],
             })
     return people
+
+blurbs = {
+    'test': {
+        'en': "This is a test message from Elfbot 3000. Beep Boop.",
+        'de': "Dies ist eine Test-Nachricht vom Weihnachtsroboter 3000. Beep. Beep.",
+    },
+    'real': {
+        'en': "Hello {}. This is Elfbot 3000. You are {}'s secret Santa!",
+        'de': "Hallo {}. Hier ist der Weihnachtsroboter 3000. Du bist {}'s Wichtelpartner!",
+    },
+}
 
 
 if __name__ == "__main__":
@@ -52,9 +64,9 @@ if __name__ == "__main__":
             print('{} is buying a gift for {}'.format(pair['giver']['name'], pair['receiver']['name']))
         else:
             if args.testrun:
-                body = "This is a test message from Elfbot 3000. Beep Boop."
+                body = blurbs['test'][pair['giver']['language']]
             else:
-                body = u"Hello {}. This is Elfbot 3000. You are {}'s secret Santa!".format(pair['giver']['name'], pair['receiver']['name'])
+                body = blurbs['real'][pair['giver']['language']].format(pair['giver']['name'], pair['receiver']['name'])
             client = Client(account_sid, auth_token)
             client.messages.create(body=body, from_=from_number, to=pair['giver']['phone_number'])
             print('Message sent!')

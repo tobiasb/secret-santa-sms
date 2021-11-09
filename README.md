@@ -17,10 +17,10 @@ Install dependencies via `pip install -r requirements.txt`
 ## CSV format
 
 ```
-Name,PhoneNumber,CoupleId
-Buffalo,+456123789,1
-Mortimer,+123789456,2
-Wilson,+123456789,3
+Name,PhoneNumber,CoupleId,Language
+Buffalo,+456123789,1,en
+Mortimer,+123789456,2,en
+Wilson,+123456789,3,en
 ```
 
 ## How to run
