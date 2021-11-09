@@ -8,7 +8,7 @@ class SecretSantaGenerator:
         for i in range(0, len(mapping)):
             giver = population[i]
             receiver = population[mapping[i]]
-            if i == mapping[i] or giver['couple_id'] == receiver['couple_id']:
+            if i == mapping[i] or giver['group_Id'] == receiver['group_Id']:
                 return False
         return True
 

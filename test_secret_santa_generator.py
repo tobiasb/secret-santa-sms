@@ -2,8 +2,8 @@ import pytest
 from secret_santa_generator import SecretSantaGenerator
 
 
-def person_from(name, couple_id):
-    return {'name': name, 'couple_id': couple_id}
+def person_from(name, group_Id):
+    return {'name': name, 'group_Id': group_Id}
 
 
 def test_individuals():
@@ -30,4 +30,4 @@ def test_couples():
     mapping = SecretSantaGenerator().generate_mapping(people)
 
     for pair in mapping:
-        assert pair['giver']['couple_id'] != pair['receiver']['couple_id']
+        assert pair['giver']['group_Id'] != pair['receiver']['group_Id']

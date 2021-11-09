@@ -17,7 +17,7 @@ def read_participants(file_name):
             people.append({
                 'name': row['Name'],
                 'phone_number': row['PhoneNumber'],
-                'couple_id': row['CoupleId'],
+                'group_Id': row['GroupId'],
                 'language': row['Language'],
             })
     return people

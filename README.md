@@ -2,7 +2,7 @@
 
 Takes a list of people from a CSV file and randomly generates secret santa mappings.
 Sends text messages (SMS) to everyone. That's it.
-Also it supports couples so people get someone other than their spouse.
+Also it supports "groups". People within a group won't get someone within the same group as secret santa.
 Also it's anonymous, the organizer won't know who has whom.
 
 _NOTE: Requires Twilio account_
@@ -17,11 +17,14 @@ Install dependencies via `pip install -r requirements.txt`
 ## CSV format
 
 ```
-Name,PhoneNumber,CoupleId,Language
+Name,PhoneNumber,GroupId,Language
 Buffalo,+456123789,1,en
 Mortimer,+123789456,2,en
-Wilson,+123456789,3,en
+Otto,+237894561,2,en
+Wilson,+123456789,3,de
 ```
+
+In this example, because Mortimer and Otto have the same group ID, they won't get each other as secret santa.
 
 ## How to run
 
