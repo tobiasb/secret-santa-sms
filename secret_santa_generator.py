@@ -2,13 +2,12 @@ import random
 
 
 class SecretSantaGenerator:
-
     @staticmethod
     def validate_mapping(population, mapping):
         for i in range(0, len(mapping)):
             giver = population[i]
             receiver = population[mapping[i]]
-            if i == mapping[i] or giver['group_Id'] == receiver['group_Id']:
+            if i == mapping[i] or giver["group_Id"] == receiver["group_Id"]:
                 return False
         return True
 
@@ -23,5 +22,4 @@ class SecretSantaGenerator:
             is_valid_mapping = self.validate_mapping(participants, current_mapping)
 
         indices = range(0, len(participants))
-        return [{'giver': participants[i], 'receiver': participants[current_mapping[i]]} for i in indices]
-
+        return [{"giver": participants[i], "receiver": participants[current_mapping[i]]} for i in indices]
