@@ -1,8 +1,7 @@
 import argparse
 import csv
 import os
-
-from twilio.rest import Client
+import requests
 
 from secret_santa_generator import SecretSantaGenerator
 
@@ -29,30 +28,32 @@ def read_participants(file_name):
 
 blurbs = {
     "test": {
-        "en": "This is a test message from Elfbot 3000. Beep Boop.",
+        "en": "👋 This is a test message from Elfbot 3000. Beep Boop. 🧝🤖",
         "de": "Dies ist eine Test-Nachricht vom Weihnachtsroboter 3000. Beep. Beep.",
     },
     "real": {
-        "en": "Hello {}. This is Elfbot 3000. You are {}'s secret Santa!",
-        "de": "Hallo {}. Hier ist der Weihnachtsroboter 3000. Du bist {}'s Wichtelpartner!",
+        "en": "Hello {} 👋. This is Elfbot 3000. You are {}'s secret Santa! 🧝🤖💜🎄",
+        "de": "Hallo {} 👋. Hier ist der Weihnachtsroboter 3000. Du bist {}'s Wichtelpartner!",
     },
 }
 
 
+def _send_message(signal_api_host, message, from_number, to_number):
+    url = "{}/v2/send".format(signal_api_host)
+    payload = {"message": message, "number": from_number, "recipients": [to_number]}
+    headers = {"Content-Type": "application/json"}
+    response = requests.request("POST", url, headers=headers, json=payload)
+    
+    if response.status_code >= 400:
+        print(f"Error sending message to {to_number}: {message}\n{response.text}")
+
+    return response
+
 if __name__ == "__main__":
-
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    from_number = os.environ.get("TWILIO_SENDER_PHONE_NUMBER")
-
-    if not account_sid or not auth_token or not from_number:
-        print(
-            "Error: Make sure the following env vars are set: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SENDER_PHONE_NUMBER"
-        )
-        exit(1)
-
     parser = argparse.ArgumentParser(description="Generates secret santa mappings and notifies people via sms")
     parser.add_argument("participants_file", help="path to csv file. See README.md for format")
+    parser.add_argument("--signal-cli-api-host", required=True, help="signal cli api host")
+    parser.add_argument("--from-number", required=True, help="phone number to send from")
     parser.add_argument("-d", "--dryrun", help="does not actually send the text message", action="store_true")
     parser.add_argument("-t", "--testrun", help="sends a test text message", action="store_true")
     args = parser.parse_args()
@@ -76,6 +77,5 @@ if __name__ == "__main__":
                 body = blurbs["real"][pair["giver"]["language"]].format(
                     pair["giver"]["name"], pair["receiver"]["name"]
                 )
-            client = Client(account_sid, auth_token)
-            client.messages.create(body=body, from_=from_number, to=pair["giver"]["phone_number"])
-            print("Message sent!")
+            _send_message(args.signal_cli_api_host, body, args.from_number, pair["giver"]["phone_number"])
+            print(f"Message sent to {pair['giver']['phone_number']}!")

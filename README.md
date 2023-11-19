@@ -1,16 +1,13 @@
 # Elfbot 3000
 
 Takes a list of people from a CSV file and randomly generates secret santa mappings.
-Sends text messages (SMS) to everyone. That's it.
+Sends text messages (Signal) to everyone. That's it.
 Also it supports "groups". People within a group won't get someone within the same group as secret santa.
 Also it's anonymous, the organizer won't know who has whom.
 
-_NOTE: Requires Twilio account_
+_NOTE: Requires Signal CLI REST API_
 
 ## Setup
-
-Set up the necessary environment variables with your information from the Twilio dashboard.
-Put them into `twilio.env` and execute `source twilio.env`
 
 Install dependencies via `pip install -r requirements.txt`
 
@@ -30,8 +27,8 @@ In this example, because Mortimer and Otto have the same group ID, they won't ge
 
 Execute tests via `pytest`.
 
-Do a dry run: `python send_secret_santas.py <your file>.csv -d`
+Do a dry run: `python send_secret_santas.py <your file>.csv --signal-cli-api-host=localhost:9000 --from-number=+15555555555 -d`
 
-Send a test message to everyone: `python send_secret_santas.py <your file>.csv -t`
+Send a test message to everyone: `python send_secret_santas.py <your file>.csv --signal-cli-api-host=localhost:9000 --from-number=+15555555555 -t`
 
-Do the real thing: `python send_secret_santas.py <your file>.csv`
+Do the real thing: `python send_secret_santas.py <your file>.csv --signal-cli-api-host=localhost:9000 --from-number=+15555555555`
