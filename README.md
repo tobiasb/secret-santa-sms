@@ -12,7 +12,7 @@ _NOTE: Requires Twilio account_
 Set up the necessary environment variables with your information from the Twilio dashboard.
 Put them into `twilio.env` and execute `source twilio.env`
 
-Install dependencies via `pip install -r requirements.txt`
+Install dependencies via `pipenv install`
 
 ## CSV format
 
@@ -30,8 +30,8 @@ In this example, because Mortimer and Otto have the same group ID, they won't ge
 
 Execute tests via `pytest`.
 
-Do a dry run: `python send_secret_santas.py <your file>.csv -d`
+Do a dry run: `pipenv run python send_secret_santas.py <your file>.csv -d`
 
-Send a test message to everyone: `python send_secret_santas.py <your file>.csv -t`
+Send a test message to everyone: `pipenv run python send_secret_santas.py <your file>.csv -t`
 
-Do the real thing: `python send_secret_santas.py <your file>.csv`
+Do the real thing: `pipenv run python send_secret_santas.py <your file>.csv`
