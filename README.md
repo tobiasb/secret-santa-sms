@@ -17,11 +17,11 @@ Install dependencies via `pipenv install`
 ## CSV format
 
 ```
-Name,PhoneNumber,GroupId,Language
-Buffalo,+456123789,1,en
-Mortimer,+123789456,2,en
-Otto,+237894561,2,en
-Wilson,+123456789,3,de
+Name,PhoneNumber,NotWith,Language
+Buffalo,+456123789,Mortimer,en
+Mortimer,+123789456,,en
+Otto,+237894561,Wilson,en
+Wilson,+123456789,Otto,de
 ```
 
 In this example, because Mortimer and Otto have the same group ID, they won't get each other as secret santa.

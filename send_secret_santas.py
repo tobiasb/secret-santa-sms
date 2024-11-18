@@ -20,7 +20,7 @@ def read_participants(file_name):
                 {
                     "name": row["Name"],
                     "phone_number": row["PhoneNumber"],
-                    "group_Id": row["GroupId"],
+                    "not_withs": row["NotWith"].split("|"),
                     "language": row.get("Language", "en"),
                 }
             )
@@ -51,10 +51,21 @@ if __name__ == "__main__":
         )
         exit(1)
 
-    parser = argparse.ArgumentParser(description="Generates secret santa mappings and notifies people via sms")
-    parser.add_argument("participants_file", help="path to csv file. See README.md for format")
-    parser.add_argument("-d", "--dryrun", help="does not actually send the text message", action="store_true")
-    parser.add_argument("-t", "--testrun", help="sends a test text message", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="Generates secret santa mappings and notifies people via sms"
+    )
+    parser.add_argument(
+        "participants_file", help="path to csv file. See README.md for format"
+    )
+    parser.add_argument(
+        "-d",
+        "--dryrun",
+        help="does not actually send the text message",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-t", "--testrun", help="sends a test text message", action="store_true"
+    )
     args = parser.parse_args()
 
     participants = read_participants(args.participants_file)
@@ -68,7 +79,11 @@ if __name__ == "__main__":
 
     for pair in mapping:
         if args.dryrun:
-            print("{} is buying a gift for {}".format(pair["giver"]["name"], pair["receiver"]["name"]))
+            print(
+                "{} is buying a gift for {}".format(
+                    pair["giver"]["name"], pair["receiver"]["name"]
+                )
+            )
         else:
             if args.testrun:
                 body = blurbs["test"][pair["giver"]["language"]]
@@ -77,5 +92,7 @@ if __name__ == "__main__":
                     pair["giver"]["name"], pair["receiver"]["name"]
                 )
             client = Client(account_sid, auth_token)
-            client.messages.create(body=body, from_=from_number, to=pair["giver"]["phone_number"])
+            client.messages.create(
+                body=body, from_=from_number, to=pair["giver"]["phone_number"]
+            )
             print("Message sent!")
