@@ -5,6 +5,7 @@ import os
 import random
 import shlex
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -82,13 +83,39 @@ def select_pairs(mapping, only):
     return [pair for pair in mapping if pair["giver"]["name"] in only]
 
 
-def make_twilio_sender(account_sid, auth_token, from_number):
-    client = Client(account_sid, auth_token)
+SMS_DELIVERY_WAIT_SECONDS = 30
+SMS_DELIVERY_POLL_SECONDS = 3
 
-    def send(to, body):
-        client.messages.create(body=body, from_=from_number, to=to)
 
-    return send
+class TwilioSender:
+    """Twilio accepts a message first and can fail it later (e.g. error 30034), so check_delivery polls."""
+
+    def __init__(self, account_sid, auth_token, from_number):
+        self.client = Client(account_sid, auth_token)
+        self.from_number = from_number
+
+    def __call__(self, to, body):
+        """Returns the message SID."""
+        return self.client.messages.create(body=body, from_=self.from_number, to=to).sid
+
+    def check_delivery(self, sids):
+        """Takes {name: sid}. Returns ({name: reason} failed, [names] still unconfirmed at the deadline)."""
+        failed = {}
+        pending = dict(sids)
+        deadline = time.monotonic() + SMS_DELIVERY_WAIT_SECONDS
+        while pending and time.monotonic() < deadline:
+            time.sleep(SMS_DELIVERY_POLL_SECONDS)
+            for name, sid in list(pending.items()):
+                message = self.client.messages(sid).fetch()
+                if message.status == "delivered":
+                    del pending[name]
+                elif message.status in ("failed", "undelivered"):
+                    reason = "Twilio says {}, error {}".format(message.status, message.error_code)
+                    if message.error_code == 30034:
+                        reason += " (US number? set its Channel to signal)"
+                    failed[name] = reason
+                    del pending[name]
+        return failed, sorted(pending)
 
 
 def make_signal_sender(api_url, from_number):
@@ -126,7 +153,7 @@ def build_senders(channels, env):
 
     senders = {}
     if "sms" in channels:
-        senders["sms"] = make_twilio_sender(
+        senders["sms"] = TwilioSender(
             env["TWILIO_ACCOUNT_SID"], env["TWILIO_AUTH_TOKEN"], env["TWILIO_SENDER_PHONE_NUMBER"]
         )
     if "signal" in channels:
@@ -137,14 +164,33 @@ def build_senders(channels, env):
 def send_messages(pairs, senders, testrun):
     """Sends one message per pair over the giver's channel. Returns the giver names whose send failed."""
     failed = []
+    receipts = {}
     for pair in pairs:
         giver = pair["giver"]
+        channel = giver["channel"]
         try:
-            senders[giver["channel"]](giver["phone_number"], message_body(pair, testrun))
-            print("🎁 Message sent to {} via {}!".format(giver["name"], giver["channel"]))
+            receipt = senders[channel](giver["phone_number"], message_body(pair, testrun))
+            receipts.setdefault(channel, {})[giver["name"]] = receipt
+            print("🎁 Message sent to {} via {}!".format(giver["name"], channel))
         except Exception as e:
-            print("💥 Failed to send to {} via {}: {}".format(giver["name"], giver["channel"], e))
+            print("💥 Failed to send to {} via {}: {}".format(giver["name"], channel, e))
             failed.append(giver["name"])
+
+    for channel, sent in receipts.items():
+        check = getattr(senders[channel], "check_delivery", None)
+        if not check:
+            continue
+        print("⏳ Checking {} delivery (up to {}s)...".format(channel, SMS_DELIVERY_WAIT_SECONDS))
+        try:
+            undelivered, unconfirmed = check(sent)
+        except Exception as e:
+            print("⚠️  Couldn't check {} delivery: {}".format(channel, e))
+            continue
+        for name, reason in undelivered.items():
+            print("💥 {} didn't get it via {}: {}".format(name, channel, reason))
+            failed.append(name)
+        if unconfirmed:
+            print("🤷 Not confirmed delivered yet, check Twilio's logs: {}".format(", ".join(unconfirmed)))
     return failed
 
 

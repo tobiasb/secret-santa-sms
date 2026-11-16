@@ -3,6 +3,7 @@ import random
 import shlex
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from types import SimpleNamespace
 
 import pytest
 
@@ -167,24 +168,38 @@ def test_send_messages_uses_channel_and_continues_after_failure():
 
 
 class FakeTwilio:
-    """Stands in for twilio.rest.Client. Records sends; fails numbers in fail_to."""
+    """Stands in for twilio.rest.Client.
 
-    def __init__(self, fail_to=()):
+    create() raises for numbers in fail_to. Fetching a message reports statuses[to]
+    as (status, error_code), default delivered.
+    """
+
+    def __init__(self, fail_to=(), statuses=None):
         self.fail_to = set(fail_to)
+        self.statuses = statuses or {}
         self.sent = {}
+        self.messages = FakeTwilioMessages(self)
 
     def __call__(self, account_sid, auth_token):
         return self
 
-    @property
-    def messages(self):
-        return self
+
+class FakeTwilioMessages:
+    def __init__(self, twilio):
+        self.twilio = twilio
 
     def create(self, body, from_, to):
         assert from_ == "+15550000000"
-        if to in self.fail_to:
+        if to in self.twilio.fail_to:
             raise RuntimeError("HTTP 400: nope")
-        self.sent[to] = body
+        self.twilio.sent[to] = body
+        return SimpleNamespace(sid="SM" + to)
+
+    def __call__(self, sid):
+        status, error_code = self.twilio.statuses.get(sid[2:], ("delivered", None))
+        if status == "boom":
+            raise RuntimeError("Twilio API down")
+        return SimpleNamespace(fetch=lambda: SimpleNamespace(status=status, error_code=error_code))
 
 
 class FakeSignalApi:
@@ -252,6 +267,9 @@ def cli(tmp_path, monkeypatch, capsys, signal_api):
         "SIGNAL_API_URL": signal_api.url,
     }
 
+    monkeypatch.setattr(send_secret_santas, "SMS_DELIVERY_WAIT_SECONDS", 0.3)
+    monkeypatch.setattr(send_secret_santas, "SMS_DELIVERY_POLL_SECONDS", 0.01)
+
     def run(argv, twilio, signal_fail_to=(), env_overrides=None):
         monkeypatch.setattr(send_secret_santas, "Client", twilio)
         signal_api.reset(signal_fail_to)
@@ -308,6 +326,37 @@ def test_cli_resend_after_switching_channel(cli, signal_api):
 
     assert code == 0
     assert signal_api.sent == {"+1002": expected_twilio.sent["+1002"]}
+
+
+def test_cli_sms_blocked_after_acceptance_counts_as_failed(cli, signal_api):
+    """Twilio accepts the message, then fails it (30034 for unregistered US sends)."""
+    twilio = FakeTwilio(statuses={"+1003": ("undelivered", 30034)})
+
+    code, out = cli([cli.csv, "-t", "--seed", 1], twilio)
+
+    assert code == 1
+    assert "C didn't get it via sms: Twilio says undelivered, error 30034" in out
+    assert "set its Channel to signal" in out
+    assert "--only C -t" in out
+
+
+def test_cli_sms_unconfirmed_warns_but_succeeds(cli, signal_api):
+    twilio = FakeTwilio(statuses={"+1001": ("sent", None)})
+
+    code, out = cli([cli.csv, "-t"], twilio)
+
+    assert code == 0
+    assert "Not confirmed delivered yet, check Twilio's logs: A" in out
+
+
+def test_cli_sms_delivery_check_error_does_not_crash(cli, signal_api):
+    twilio = FakeTwilio(statuses={"+1001": ("boom", None)})
+
+    code, out = cli([cli.csv, "-t"], twilio)
+
+    assert code == 0
+    assert "Couldn't check sms delivery: Twilio API down" in out
+    assert "All 6 messages sent" in out
 
 
 def test_cli_testrun_honors_channel(cli, signal_api):

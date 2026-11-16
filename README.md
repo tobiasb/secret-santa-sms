@@ -43,6 +43,7 @@ Do the real thing: `pipenv run python send_secret_santas.py <your file>.csv`
 ## Resending
 
 Every run prints a seed. If some messages fail, the script prints a command that resends just those, using the same seed so nobody gets a different person.
+SMS counts as failed if Twilio reports it failed or undelivered within 30s of sending, since Twilio accepts messages it later blocks.
 The pairs stay the same as long as `Name`, `NotWith` and the row order don't change. Fixing a `PhoneNumber` or switching someone's `Channel` before resending is fine.
 Anyone with the seed can see all pairs via a dry run, so keep it to yourself.
 
