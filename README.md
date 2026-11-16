@@ -9,7 +9,7 @@ _NOTE: Requires a Twilio account for SMS and/or a signal-cli-rest-api instance f
 
 ## Setup
 
-Copy `twilio.env.template` to `twilio.env`, fill it in and execute `source twilio.env`.
+Copy `elfbot.env.template` to `elfbot.env`, fill it in and execute `source elfbot.env`.
 Only the channels used in the CSV need their variables: Twilio for `sms`, `SIGNAL_API_URL` for `signal`.
 `SIGNAL_SENDER_NUMBER` defaults to `TWILIO_SENDER_PHONE_NUMBER`.
 
