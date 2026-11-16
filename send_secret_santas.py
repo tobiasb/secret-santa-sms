@@ -4,10 +4,10 @@ import json
 import os
 import random
 import shlex
+import shutil
+import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 
 from twilio.rest import Client
 
@@ -118,22 +118,27 @@ class TwilioSender:
         return failed, sorted(pending)
 
 
+# Apple's curl, not Python's HTTP client: macOS Local Network privacy can deny LAN access
+# to non-Apple binaries (pyenv/Homebrew Python get "No route to host"), and /usr/bin/curl is exempt.
+CURL = "/usr/bin/curl" if os.path.exists("/usr/bin/curl") else (shutil.which("curl") or "curl")
+
+
 def make_signal_sender(api_url, from_number):
     """Sends via signal-cli-rest-api."""
 
     def send(to, body):
-        request = urllib.request.Request(
-            api_url.rstrip("/") + "/v2/send",
-            data=json.dumps({"message": body, "number": from_number, "recipients": [to]}).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
+        payload = json.dumps({"message": body, "number": from_number, "recipients": [to]})
+        result = subprocess.run(
+            [CURL, "-sS", "--max-time", "30", "-X", "POST",
+             "-H", "Content-Type: application/json", "--data-binary", "@-",
+             "-w", "\n%{http_code}", api_url.rstrip("/") + "/v2/send"],
+            input=payload, capture_output=True, text=True,
         )
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                response.read()
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode(errors="replace")[:300]
-            raise RuntimeError("Signal API HTTP {}: {}".format(e.code, detail)) from e
+        if result.returncode != 0:
+            raise RuntimeError("curl to Signal API failed: {}".format(result.stderr.strip()))
+        response, _, status = result.stdout.rpartition("\n")
+        if not status.startswith("2"):
+            raise RuntimeError("Signal API HTTP {}: {}".format(status, response[:300]))
 
     return send
 

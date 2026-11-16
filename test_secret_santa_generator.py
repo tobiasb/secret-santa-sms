@@ -422,6 +422,22 @@ def test_cli_sms_only_csv_needs_no_signal(cli, signal_api):
     assert signal_api.sent == {}
 
 
+def test_cli_signal_api_unreachable_counts_as_failed(cli, signal_api):
+    code, out = cli([cli.csv, "-t", "--only", "E"], FakeTwilio(), env_overrides={"SIGNAL_API_URL": "http://127.0.0.1:9"})
+
+    assert code == 1
+    assert "Failed to send to E via signal: curl to Signal API failed" in out
+
+
+def test_signal_message_with_quotes_survives(signal_api):
+    send = send_secret_santas.make_signal_sender(signal_api.url, "+15550000000")
+    body = "O'Brien's \"secret\" Santa 🎅 $HOME `x`"
+
+    send("+1005", body)
+
+    assert signal_api.sent == {"+1005": body}
+
+
 def test_cli_signal_sender_override(cli, signal_api):
     code, out = cli(
         [cli.csv, "-t", "--only", "E"],
