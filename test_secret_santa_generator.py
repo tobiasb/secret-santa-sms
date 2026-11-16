@@ -92,6 +92,28 @@ def test_read_participants_without_optional_columns(tmp_path):
     assert all(p["channel"] == "sms" for p in people)
 
 
+def test_read_participants_header_ignores_case_and_spaces(tmp_path):
+    csv_file = tmp_path / "people.csv"
+    csv_file.write_text("name, phonenumber ,NOTWITH,channel\nA,+1,,signal\n")
+
+    (person_a,) = read_participants(csv_file)
+
+    assert person_a["phone_number"] == "+1"
+    assert person_a["channel"] == "signal"
+
+
+@pytest.mark.parametrize(
+    "header, problem",
+    [("Name,PhoneNumber,NotWith,Chanel", "Unknown: chanel"), ("Name,NotWith", "Missing: phonenumber")],
+)
+def test_read_participants_bad_header_raises(tmp_path, header, problem):
+    csv_file = tmp_path / "people.csv"
+    csv_file.write_text(header + "\n")
+
+    with pytest.raises(ValueError, match=problem):
+        read_participants(csv_file)
+
+
 def test_read_participants_unknown_channel_raises(tmp_path):
     csv_file = tmp_path / "people.csv"
     csv_file.write_text("Name,PhoneNumber,NotWith,Channel\nA,+1,,whatsapp\n")
@@ -272,7 +294,20 @@ def test_cli_resend_command_reproduces_failed_messages(cli, signal_api):
     code, out = cli(resend_argv, twilio)
 
     assert code == 0
-    assert dict(twilio.sent, **signal_api.sent) == {k: expected[k] for k in ("+1002", "+1005")}
+    assert twilio.sent == {"+1002": expected["+1002"]}
+    assert signal_api.sent == {"+1005": expected["+1005"]}
+
+
+def test_cli_resend_after_switching_channel(cli, signal_api):
+    """The fix flow for an SMS that can't be delivered: switch to signal, resend, same pair."""
+    expected_twilio = FakeTwilio()
+    cli([cli.csv, "--seed", 99], expected_twilio)
+    cli.csv.write_text(FAMILY_CSV.replace("B,+1002,A,de,sms", "B,+1002,A,de,signal"))
+
+    code, _ = cli([cli.csv, "--seed", 99, "--only", "B"], FakeTwilio())
+
+    assert code == 0
+    assert signal_api.sent == {"+1002": expected_twilio.sent["+1002"]}
 
 
 def test_cli_testrun_honors_channel(cli, signal_api):

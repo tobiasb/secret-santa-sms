@@ -43,7 +43,8 @@ Do the real thing: `pipenv run python send_secret_santas.py <your file>.csv`
 ## Resending
 
 Every run prints a seed. If some messages fail, the script prints a command that resends just those, using the same seed so nobody gets a different person.
-It only works if the CSV is unchanged (same people, same order). Anyone with the seed can see all pairs via a dry run, so keep it to yourself.
+The pairs stay the same as long as `Name`, `NotWith` and the row order don't change. Fixing a `PhoneNumber` or switching someone's `Channel` before resending is fine.
+Anyone with the seed can see all pairs via a dry run, so keep it to yourself.
 
 ```
 pipenv run python send_secret_santas.py <your file>.csv --seed 123 --only 'Otto,Wilson'

@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import random
+import shlex
 import sys
 import urllib.error
 import urllib.request
@@ -12,15 +13,30 @@ from twilio.rest import Client
 from secret_santa_generator import SecretSantaGenerator
 
 CHANNELS = ("sms", "signal")
+REQUIRED_COLUMNS = ("name", "phonenumber", "notwith")
+OPTIONAL_COLUMNS = ("language", "channel")
 
 
 def read_participants(file_name):
+    """Column names are matched ignoring case and surrounding spaces."""
     people = []
 
     with open(file_name) as csv_file:
-        for row in csv.DictReader(csv_file):
-            name = row["Name"].strip()
-            channel = (row.get("Channel") or "sms").strip().lower()
+        reader = csv.reader(csv_file)
+        header = [h.strip().lower() for h in next(reader, [])]
+        missing = [c for c in REQUIRED_COLUMNS if c not in header]
+        unknown = [h for h in header if h not in REQUIRED_COLUMNS + OPTIONAL_COLUMNS]
+        if missing or unknown:
+            raise ValueError(
+                "Bad CSV header. Missing: {}. Unknown: {}. See README.md for the format.".format(
+                    ", ".join(missing) or "none", ", ".join(unknown) or "none"
+                )
+            )
+
+        for values in reader:
+            row = dict(zip(header, values))
+            name = row["name"].strip()
+            channel = (row.get("channel") or "sms").strip().lower()
             if channel not in CHANNELS:
                 raise ValueError(
                     "{} has unknown Channel '{}', use sms or signal".format(name, channel)
@@ -28,9 +44,9 @@ def read_participants(file_name):
             people.append(
                 {
                     "name": name,
-                    "phone_number": row["PhoneNumber"].strip(),
-                    "not_withs": [n.strip() for n in row["NotWith"].split("|") if n.strip()],
-                    "language": (row.get("Language") or "en").strip(),
+                    "phone_number": row["phonenumber"].strip(),
+                    "not_withs": [n.strip() for n in row["notwith"].split("|") if n.strip()],
+                    "language": (row.get("language") or "en").strip(),
                     "channel": channel,
                 }
             )
@@ -195,11 +211,11 @@ def main(argv=None, env=None):
     if failed:
         print(
             "\n⚠️  {} failed. Fix the problem, then resend only to them:\n"
-            "pipenv run python send_secret_santas.py {} --seed {} --only '{}'{}".format(
+            "pipenv run python send_secret_santas.py {} --seed {} --only {}{}".format(
                 len(failed),
-                args.participants_file,
+                shlex.quote(str(args.participants_file)),
                 seed,
-                ",".join(failed),
+                shlex.quote(",".join(failed)),
                 " -t" if args.testrun else "",
             )
         )
