@@ -317,6 +317,27 @@ def test_cli_signal_only_needs_no_twilio(cli, signal_api):
     assert sorted(signal_api.sent) == ["+1005", "+1006"]
 
 
+def test_cli_signal_only_csv_needs_no_twilio(cli, signal_api):
+    cli.csv.write_text("Name,PhoneNumber,NotWith,Channel\nE,+1005,,signal\nF,+1006,,signal\n")
+    no_twilio = {"TWILIO_ACCOUNT_SID": None, "TWILIO_AUTH_TOKEN": None}
+
+    code, out = cli([cli.csv, "-t"], FakeTwilio(), env_overrides=no_twilio)
+
+    assert code == 0
+    assert sorted(signal_api.sent) == ["+1005", "+1006"]
+
+
+def test_cli_sms_only_csv_needs_no_signal(cli, signal_api):
+    cli.csv.write_text("Name,PhoneNumber,NotWith\nA,+1001,\nB,+1002,\n")
+    twilio = FakeTwilio()
+
+    code, out = cli([cli.csv, "-t"], twilio, env_overrides={"SIGNAL_API_URL": None})
+
+    assert code == 0
+    assert sorted(twilio.sent) == ["+1001", "+1002"]
+    assert signal_api.sent == {}
+
+
 def test_cli_signal_sender_override(cli, signal_api):
     code, out = cli(
         [cli.csv, "-t", "--only", "E"],

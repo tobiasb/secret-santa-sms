@@ -28,6 +28,7 @@ Wilson,+123456789,Otto,de,
 Exclusions are one-way: here Otto won't draw Wilson and Wilson won't draw Otto, but Mortimer could still draw Buffalo.
 `Language` is optional (`en` or `de`, default `en`).
 `Channel` is optional (`sms` or `signal`, default `sms`). Test runs and resends use it too.
+Use `signal` for US numbers if your Twilio number isn't A2P 10DLC registered: Twilio blocks those texts (error 30034).
 
 ## How to run
 
