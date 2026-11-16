@@ -1,12 +1,17 @@
 import argparse
 import csv
+import json
 import os
 import random
 import sys
+import urllib.error
+import urllib.request
 
 from twilio.rest import Client
 
 from secret_santa_generator import SecretSantaGenerator
+
+CHANNELS = ("sms", "signal")
 
 
 def read_participants(file_name):
@@ -14,12 +19,19 @@ def read_participants(file_name):
 
     with open(file_name) as csv_file:
         for row in csv.DictReader(csv_file):
+            name = row["Name"].strip()
+            channel = (row.get("Channel") or "sms").strip().lower()
+            if channel not in CHANNELS:
+                raise ValueError(
+                    "{} has unknown Channel '{}', use sms or signal".format(name, channel)
+                )
             people.append(
                 {
-                    "name": row["Name"].strip(),
+                    "name": name,
                     "phone_number": row["PhoneNumber"].strip(),
                     "not_withs": [n.strip() for n in row["NotWith"].split("|") if n.strip()],
                     "language": (row.get("Language") or "en").strip(),
+                    "channel": channel,
                 }
             )
     return people
@@ -54,23 +66,75 @@ def select_pairs(mapping, only):
     return [pair for pair in mapping if pair["giver"]["name"] in only]
 
 
-def send_messages(pairs, send, testrun):
-    """Sends one message per pair. Returns the giver names whose send failed."""
+def make_twilio_sender(account_sid, auth_token, from_number):
+    client = Client(account_sid, auth_token)
+
+    def send(to, body):
+        client.messages.create(body=body, from_=from_number, to=to)
+
+    return send
+
+
+def make_signal_sender(api_url, from_number):
+    """Sends via signal-cli-rest-api."""
+
+    def send(to, body):
+        request = urllib.request.Request(
+            api_url.rstrip("/") + "/v2/send",
+            data=json.dumps({"message": body, "number": from_number, "recipients": [to]}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                response.read()
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace")[:300]
+            raise RuntimeError("Signal API HTTP {}: {}".format(e.code, detail)) from e
+
+    return send
+
+
+def build_senders(channels, env):
+    """Returns ({channel: send(to, body)}, []) or (None, [missing env var names])."""
+    signal_from = env.get("SIGNAL_SENDER_NUMBER") or env.get("TWILIO_SENDER_PHONE_NUMBER")
+    required = {
+        "sms": ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SENDER_PHONE_NUMBER"],
+        "signal": ["SIGNAL_API_URL"],
+    }
+    missing = [var for channel in channels for var in required[channel] if not env.get(var)]
+    if "signal" in channels and not signal_from:
+        missing.append("SIGNAL_SENDER_NUMBER")
+    if missing:
+        return None, missing
+
+    senders = {}
+    if "sms" in channels:
+        senders["sms"] = make_twilio_sender(
+            env["TWILIO_ACCOUNT_SID"], env["TWILIO_AUTH_TOKEN"], env["TWILIO_SENDER_PHONE_NUMBER"]
+        )
+    if "signal" in channels:
+        senders["signal"] = make_signal_sender(env["SIGNAL_API_URL"], signal_from)
+    return senders, []
+
+
+def send_messages(pairs, senders, testrun):
+    """Sends one message per pair over the giver's channel. Returns the giver names whose send failed."""
     failed = []
     for pair in pairs:
-        name = pair["giver"]["name"]
+        giver = pair["giver"]
         try:
-            send(pair["giver"]["phone_number"], message_body(pair, testrun))
-            print("🎁 Message sent to {}!".format(name))
+            senders[giver["channel"]](giver["phone_number"], message_body(pair, testrun))
+            print("🎁 Message sent to {} via {}!".format(giver["name"], giver["channel"]))
         except Exception as e:
-            print("💥 Failed to send to {}: {}".format(name, e))
-            failed.append(name)
+            print("💥 Failed to send to {} via {}: {}".format(giver["name"], giver["channel"], e))
+            failed.append(giver["name"])
     return failed
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description="Generates secret santa mappings and notifies people via sms"
+        description="Generates secret santa mappings and notifies people via sms or signal"
     )
     parser.add_argument(
         "participants_file", help="path to csv file. See README.md for format"
@@ -98,18 +162,9 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def main(argv=None):
+def main(argv=None, env=None):
     args = parse_args(argv)
-
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    from_number = os.environ.get("TWILIO_SENDER_PHONE_NUMBER")
-
-    if not args.dryrun and not (account_sid and auth_token and from_number):
-        print(
-            "Error: Make sure the following env vars are set: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SENDER_PHONE_NUMBER"
-        )
-        return 1
+    env = os.environ if env is None else env
 
     seed = args.seed if args.seed is not None else random.SystemRandom().randrange(2**32)
     participants = read_participants(args.participants_file)
@@ -119,19 +174,24 @@ def main(argv=None):
     if args.dryrun:
         print("Dry run (seed {})".format(seed))
         for pair in pairs:
-            print("{} is buying a gift for {}".format(pair["giver"]["name"], pair["receiver"]["name"]))
+            print(
+                "{} is buying a gift for {} (via {})".format(
+                    pair["giver"]["name"], pair["receiver"]["name"], pair["giver"]["channel"]
+                )
+            )
         return 0
+
+    channels = sorted({pair["giver"]["channel"] for pair in pairs})
+    senders, missing = build_senders(channels, env)
+    if missing:
+        print("Error: Make sure the following env vars are set: {}".format(", ".join(missing)))
+        return 1
 
     if args.testrun:
         print("Test run")
     print("🌱 Seed: {} (keep this to resend without reshuffling)".format(seed))
 
-    client = Client(account_sid, auth_token)
-
-    def send(to, body):
-        client.messages.create(body=body, from_=from_number, to=to)
-
-    failed = send_messages(pairs, send, args.testrun)
+    failed = send_messages(pairs, senders, args.testrun)
     if failed:
         print(
             "\n⚠️  {} failed. Fix the problem, then resend only to them:\n"

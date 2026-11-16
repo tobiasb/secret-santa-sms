@@ -1,37 +1,39 @@
 # Elfbot 3000
 
 Takes a list of people from a CSV file and randomly generates secret santa mappings.
-Sends text messages (SMS) to everyone. That's it.
+Sends everyone a message by SMS (Twilio) or Signal ([signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api)). That's it.
 Also it supports exclusions: `NotWith` lists people (separated by `|`) the giver must not draw, e.g. their partner.
 Also it's anonymous, the organizer won't know who has whom.
 
-_NOTE: Requires Twilio account_
+_NOTE: Requires a Twilio account for SMS and/or a signal-cli-rest-api instance for Signal_
 
 ## Setup
 
-Set up the necessary environment variables with your information from the Twilio dashboard.
-Put them into `twilio.env` and execute `source twilio.env`
+Copy `twilio.env.template` to `twilio.env`, fill it in and execute `source twilio.env`.
+Only the channels used in the CSV need their variables: Twilio for `sms`, `SIGNAL_API_URL` for `signal`.
+`SIGNAL_SENDER_NUMBER` defaults to `TWILIO_SENDER_PHONE_NUMBER`.
 
 Install dependencies via `pipenv install --dev` (Python 3.13)
 
 ## CSV format
 
 ```
-Name,PhoneNumber,NotWith,Language
-Buffalo,+456123789,Mortimer|Otto,en
-Mortimer,+123789456,,en
-Otto,+237894561,Wilson,en
-Wilson,+123456789,Otto,de
+Name,PhoneNumber,NotWith,Language,Channel
+Buffalo,+456123789,Mortimer|Otto,en,sms
+Mortimer,+123789456,,en,sms
+Otto,+237894561,Wilson,en,signal
+Wilson,+123456789,Otto,de,
 ```
 
 Exclusions are one-way: here Otto won't draw Wilson and Wilson won't draw Otto, but Mortimer could still draw Buffalo.
 `Language` is optional (`en` or `de`, default `en`).
+`Channel` is optional (`sms` or `signal`, default `sms`). Test runs and resends use it too.
 
 ## How to run
 
 Execute tests via `pipenv run pytest`.
 
-Do a dry run (no Twilio env vars needed, prints who has whom): `pipenv run python send_secret_santas.py <your file>.csv -d`
+Do a dry run (no env vars needed, prints who has whom): `pipenv run python send_secret_santas.py <your file>.csv -d`
 
 Send a test message to everyone: `pipenv run python send_secret_santas.py <your file>.csv -t`
 
